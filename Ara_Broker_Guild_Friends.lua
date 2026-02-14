@@ -131,7 +131,7 @@ local function GetBNGetFriendInfo(friendIndex)
 			local characterName = accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName or "";
 			local gameAccountID = accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.gameAccountID or 0;
 			local isOnline = accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline or false;
-			local isWowMobile = accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isWowMobile or false;
+			local isWowMobile = false; --accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isWowMobile or false;
 
 			return	accountInfo.bnetAccountID, accountInfo.accountName, accountInfo.battleTag, accountInfo.isBattleTagFriend,
 					characterName, gameAccountID, clientProgram,
@@ -160,7 +160,7 @@ local function GetBNGetGameAccountInfo(toonId)
 		local isOnline = gameAccountInfo.isOnline or false;
 		local isGameAFK = gameAccountInfo.isGameAFK or false;
 		local isGameBusy = gameAccountInfo.isGameBusy or false;
-		local isWowMobile = gameAccountInfo.isWowMobile or false;
+		local isWowMobile = false; --gameAccountInfo.isWowMobile or false;
 		return	gameAccountInfo.hasFocus, characterName, gameAccountInfo.clientProgram,
 			realmName, realmID, factionName, raceName, className, "", areaName, characterLevel,
 				richPresence, nil, nil,
