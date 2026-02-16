@@ -1133,7 +1133,11 @@ function f:SetupConfigMenu()
 	configMenu.displayMode = "MENU"
 
 	f.SetCustomScale = function(dialog)
-		local val = tonumber( dialog.editBox:GetText():match"(%d+)" )
+		local editBox = dialog.editBox or _G[dialog:GetName() .. "EditBox"]
+		if not editBox then
+			return
+		end
+		local val = tonumber( editBox:GetText():match"(%d+)" )
 		if not val or val<70 or val>200 then
 			baseScript = BasicScriptErrors:GetScript"OnHide"
 			BasicScriptErrors:SetScript("OnHide",Error_OnHide)
@@ -1151,7 +1155,14 @@ function f:SetupConfigMenu()
 		hasEditBox = 1,
 		maxLetters = 4,
 		OnAccept = AraBrokerGuildFriends.SetCustomScale,
-		OnShow = function(self) CloseDropDownMenus() self.editBox:SetText(config.scale*100) self.editBox:SetFocus() end,
+		OnShow = function(self) 
+			CloseDropDownMenus() 
+			local editBox = self.editBox or _G[self:GetName() .. "EditBox"]
+			if editBox then
+				editBox:SetText(config.scale*100) 
+				editBox:SetFocus() 
+			end
+		end,
 		OnHide = ChatEdit_FocusActiveWindow,
 		EditBoxOnEnterPressed = function(self) local p=self:GetParent() AraBrokerGuildFriends.SetCustomScale(p) p:Hide() end,
 		EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
