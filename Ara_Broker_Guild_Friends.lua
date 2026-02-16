@@ -211,10 +211,8 @@ local function UpdateFriendBlockText(updatePanel)
 end
 
 
-local friendOnline, friendOffline = ERR_FRIEND_ONLINE_SS:gsub("|Hplayer:%%s|h%[%%s%]|h",""), ERR_FRIEND_OFFLINE_S:gsub("%%s","")
-function f:CHAT_MSG_SYSTEM( msg )
-	if msg:find(friendOnline) or msg:find(friendOffline) then ShowFriends() end
-end
+-- CHAT_MSG_SYSTEM handler removed - system messages are now tainted and cannot be accessed
+-- Friend updates are handled by FRIENDLIST_UPDATE event instead
 
 function f:FRIENDLIST_UPDATE()
 	--None bnet friends
@@ -1554,7 +1552,7 @@ function f:ADDON_LOADED( addon )
 	f:RegisterEvent"GUILD_ROSTER_UPDATE"
 	f:RegisterEvent"PLAYER_GUILD_UPDATE"
 	f:RegisterEvent"FRIENDLIST_UPDATE"
-	f:RegisterEvent"CHAT_MSG_SYSTEM"
+	-- CHAT_MSG_SYSTEM removed - system messages are now tainted
 
 	f:RegisterEvent"BN_FRIEND_INFO_CHANGED"
 	f:RegisterEvent"BN_FRIEND_ACCOUNT_ONLINE"
