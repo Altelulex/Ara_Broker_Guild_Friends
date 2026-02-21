@@ -1,0 +1,19 @@
+## Interface: 50503
+
+## Title: Ara - Broker - Guild & Friends
+## Version: @project-version@
+## Author: Ara, Toxxnorr
+## Notes: Provides guildmates & friends informations and interactions.
+## SavedVariables: AraBrokerGuildFriendsDB
+## X-Credits: Tekkub (picoGuild), Vrul (DockingStation)
+
+## X-Curse-Project-ID: 1461591
+
+## LoadManagers: AddonLoader
+## X-LoadOn-Always: delayed
+
+libs\LibStub.lua
+libs\CallbackHandler-1.0.lua
+libs\LibDataBroker-1.1.lua
+
+Ara_Broker_Guild_Friends.lua
