@@ -1340,14 +1340,23 @@ function f:SetupConfigMenu()
 		end
 	end
 	ColorPickerOpacity = function()
-		c[4] = 1 - OpacitySliderFrame:GetValue()
+		local opacity = ColorPickerFrame.opacity or 0
+		if OpacitySliderFrame and OpacitySliderFrame.GetValue then
+			opacity = OpacitySliderFrame:GetValue()
+		end
+		c[4] = 1 - opacity
 	end
 	ColorPickerChange = function()
 		c[1], c[2], c[3] = ColorPickerFrame:GetColorRGB()
 		UpdateColor(cname)
 	end
 	ColorPickerCancel = function(prev)
-		c[1], c[2], c[3], c[4] = unpack(prev)
+		if prev and prev.r then
+			c[1], c[2], c[3] = prev.r, prev.g, prev.b
+			if c[4] then c[4] = 1 - (prev.opacity or 0) end
+		else
+			c[1], c[2], c[3], c[4] = unpack(prev)
+		end
 		UpdateColor(cname)
 	end
 	OpenColorPicker = function(self, colorName)
@@ -1355,14 +1364,30 @@ function f:SetupConfigMenu()
 		cname = colorName
 		c = colors[colorName]
 		local hasOpacity = c[4]
-		if hasOpacity then ColorPickerFrame.opacity = 1 - c[4] end
-		ColorPickerFrame.hasOpacity = hasOpacity
-		ColorPickerFrame.opacityFunc = hasOpacity and ColorPickerOpacity or nil
-		ColorPickerFrame.func = ColorPickerChange
-		ColorPickerFrame.cancelFunc = ColorPickerCancel
-		ColorPickerFrame.previousValues = {unpack(c)}
-		ColorPickerFrame:SetColorRGB( unpack(c) )
-		ShowUIPanel(ColorPickerFrame)--:Show()
+		if ColorPickerFrame.SetupColorPickerAndShow then
+			local info = {
+				r = c[1],
+				g = c[2],
+				b = c[3],
+				hasOpacity = hasOpacity,
+				opacity = hasOpacity and (1 - c[4]) or 0,
+				swatchFunc = ColorPickerChange,
+				opacityFunc = hasOpacity and ColorPickerOpacity or nil,
+				cancelFunc = ColorPickerCancel,
+			}
+			ColorPickerFrame:SetupColorPickerAndShow(info)
+		else
+			if hasOpacity then ColorPickerFrame.opacity = 1 - c[4] end
+			ColorPickerFrame.hasOpacity = hasOpacity
+			ColorPickerFrame.opacityFunc = hasOpacity and ColorPickerOpacity or nil
+			ColorPickerFrame.func = ColorPickerChange
+			ColorPickerFrame.cancelFunc = ColorPickerCancel
+			ColorPickerFrame.previousValues = {unpack(c)}
+			if ColorPickerFrame.SetColorRGB then
+				ColorPickerFrame:SetColorRGB( unpack(c) )
+			end
+			ShowUIPanel(ColorPickerFrame)--:Show()
+		end
 	end
 
 	SetOption = function(bt, var, val)
