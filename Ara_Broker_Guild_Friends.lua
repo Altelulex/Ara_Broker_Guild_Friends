@@ -81,6 +81,7 @@ local defaultConfig = {
 local dontShow, block, horde, config, isGuild, tip = true
 local guildEntries, friendEntries, motd, slider, nbEntries = {}, {}
 local sliderValue, hasSlider, UpdateTablet, extraHeight = 0
+local RequestGuildRoster, RequestFriendsList
 local RAID_CLASS_COLORS = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
 local info, buttons, toasts, playerRealm = {}
 local totalFriends, onlineFriends, nbRealFriends, realFriendsHeight, nbBroadcast = 0, 0, 0
@@ -115,8 +116,8 @@ local backdrop =  {
 	edgeSize=16, tile = false, tileSize=0,
 	insets = { left=3, right=3, top=3, bottom=3 } }
 
-local wipe, next, GetGuildRosterInfo, GetGuildRosterShowOffline, GetFriendInfo, IsInGuild, GuildRoster, ShowFriends, CLASS_BUTTONS, GetDifficultyColor, Ambiguate =
-	wipe, next, GetGuildRosterInfo, GetGuildRosterShowOffline, C_FriendList and C_FriendList.GetFriendInfoByIndex or GetFriendInfo, IsInGuild, GuildRoster, ShowFriends, CLASS_ICON_TCOORDS, GetQuestDifficultyColor, Ambiguate
+local wipe, next, GetGuildRosterInfo, GetGuildRosterShowOffline, GetFriendInfo, IsInGuild, CLASS_BUTTONS, GetDifficultyColor, Ambiguate =
+	wipe, next, GetGuildRosterInfo, GetGuildRosterShowOffline, C_FriendList and C_FriendList.GetFriendInfoByIndex or GetFriendInfo, IsInGuild, CLASS_ICON_TCOORDS, GetQuestDifficultyColor, Ambiguate
 
 --Not renamed in legion yet but might be
 local BNGetNumFriends = BNGetNumFriends
@@ -262,7 +263,7 @@ end
 
 function f:PLAYER_GUILD_UPDATE(unit)
 	if unit and unit ~= "player" then return end
-	if IsInGuild() then GuildRoster() end
+	if IsInGuild() and RequestGuildRoster then RequestGuildRoster() end
 end
 
 local hordeZones = "Orgrimmar,Undercity,Thunder Bluff,Silvermoon City,Durotar,Tirisfal Glades,Mulgore,Eversong Woods,Northern Barrens,Silverpine Forest,Ghostlands,Lost Isles,Kezan,Azshara,Shrine of Two Moons,Frostfire Ridge,Warspear,Zuldazar,Vol'dun,Zuldazar,Nazmir,"
@@ -966,10 +967,10 @@ UpdateTablet = function()
 	if config.statusMode=="icon" then maxWidth = maxWidth + ICON_SIZE + TEXT_OFFSET end
 
 	-- guild xp / motd / broadcast
-	local canEditMOTD = CanEditMOTD()
+	local canEditMOTD = isGuild and not InCombatLockdown() and CanEditMOTD()
 	motd:SetPoint("TOPLEFT", GAP, -GAP)
 	motd:SetScript("OnClick",nil)
-	local guildMOTD = isGuild and GetGuildRosterMOTD()
+	local guildMOTD = isGuild and not InCombatLockdown() and GetGuildRosterMOTD() or nil
 	if isGuild and (nbTotalEntries>0 and guildMOTD or nbTotalEntries==0) or not isGuild and (BNFeaturesEnabled() and totalRF>0 and config.showOwnBroadcast or nbTotalEntries==0) then
 		motd.name:SetJustifyH"LEFT"
 		motd.name:SetTextColor( unpack(colors.title) )
@@ -1453,14 +1454,14 @@ end
 
 local ldb = LibStub("LibDataBroker-1.1")
 
-local orgGuildRoster = GuildRoster or C_GuildInfo.GuildRoster
+local orgGuildRoster = C_GuildInfo and C_GuildInfo.GuildRoster or GuildRoster
 f.GuildBlock = ldb:NewDataObject( "|cFFFFB366Ara|r Guild", {
 	type = "data source",
 	text = GUILD,
 	icon = [[Interface\AddOns\Ara_Broker_Guild_Friends\guild]],
 	OnEnter = function(self)
 		isGuild = true
-		if IsInGuild() then orgGuildRoster() end
+		if IsInGuild() and not InCombatLockdown() and RequestGuildRoster then RequestGuildRoster() end
 		f:GUILD_ROSTER_UPDATE()--Force update in case user changed checkbox option for "show offline"
 		AnchorTablet(self)
 	end,
@@ -1487,7 +1488,7 @@ f.FriendsBlock = ldb:NewDataObject( "|cFFFFB366Ara|r Friends", {
 	icon = [[Interface\AddOns\Ara_Broker_Guild_Friends\friends]],
 	OnEnter = function(self)
 		isGuild = false
-		ShowFriends()
+		if RequestFriendsList then RequestFriendsList() end
 		AnchorTablet(self)
 	end,
 	OnLeave = Block_OnLeave,
@@ -1513,21 +1514,25 @@ f.FriendsBlock = ldb:NewDataObject( "|cFFFFB366Ara|r Friends", {
 
 local guildTimer, friendTimer = 0, 0
 
-GuildRoster = function(...)
+RequestGuildRoster = function(...)
 	guildTimer = 0
-	return orgGuildRoster(...)
+	if orgGuildRoster then
+		return orgGuildRoster(...)
+	end
 end
 
 local orgShowFriends = C_FriendList and C_FriendList.ShowFriends or ShowFriends
-ShowFriends = function(...)
+RequestFriendsList = function(...)
 	friendTimer = 0
-	return orgShowFriends(...)
+	if orgShowFriends then
+		return orgShowFriends(...)
+	end
 end
 
 
 local function OnUpdate( self )
-	if IsInGuild() then GuildRoster() end
-	ShowFriends()
+	if IsInGuild() and RequestGuildRoster then RequestGuildRoster() end
+	if RequestFriendsList then RequestFriendsList() end
 end
 
 
@@ -1642,7 +1647,7 @@ function f:ADDON_LOADED( addon )
 	end )
 
 	motd = buttons[0]
-	ShowFriends()
+	if RequestFriendsList then RequestFriendsList() end
 	guildTimer = 14 -- delay update to avoid d/c
 	f:GUILD_ROSTER_UPDATE()
 
