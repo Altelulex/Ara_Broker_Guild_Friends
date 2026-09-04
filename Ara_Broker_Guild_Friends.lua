@@ -72,6 +72,7 @@ local defaultConfig = {
 	hResizeTip = true,
 	hRemoveFriend = true,
 	showBlockHints = true,
+	bnetFriendsMode = "all",
 	hbOpenPanel = true,
 	hbConfig = true,
 	hbToggleNotes = true,
@@ -205,9 +206,60 @@ local function UpdateGuildBlockText()
 	end
 end
 
-local function UpdateFriendBlockText(updatePanel)
+local function GetFriendListCounts()
+	if C_FriendList and C_FriendList.GetNumFriends and C_FriendList.GetNumOnlineFriends then
+		return C_FriendList.GetNumFriends() or 0, C_FriendList.GetNumOnlineFriends() or 0
+	end
+	local getNumFriends = _G.GetNumFriends
+	if not getNumFriends then return 0, 0 end
+	local total, online = getNumFriends()
+	return total or 0, online or 0
+end
+
+local function GetFilteredBNetCounts()
 	local totalRF, onlineRF = BNGetNumFriends()
-	f.FriendsBlock.text = (config.showFriendsTotal and "%d/%d" or "%d"):format( onlineFriends + onlineRF, totalFriends + totalRF )
+	if totalRF == 0 then
+		return 0, 0
+	end
+
+	if config.bnetFriendsMode == "all" then
+		local visibleTotal = 0
+		for i = 1, totalRF do
+			local _, _, _, _, _, _, _, isOnline, _, _, _, _, _, _, _, _, _, _, isFavorite = GetBNGetFriendInfo(i)
+			if isOnline or isFavorite then
+				visibleTotal = visibleTotal + 1
+			end
+		end
+		return onlineRF, visibleTotal
+	end
+
+	local visibleOnline = 0
+	for i = 1, totalRF do
+		local _, _, _, _, _, toonID, client, isOnline = GetBNGetFriendInfo(i)
+		if isOnline then
+			client = clientsTable[client] or 5
+			if config.bnetFriendsMode == "ingame" then
+				if client ~= 0 and client ~= 5 and client ~= 8 then
+					visibleOnline = visibleOnline + 1
+				end
+			elseif config.bnetFriendsMode == "samegame" then
+				if client == 1 then
+					local _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, wowProjectID = GetBNGetGameAccountInfo(toonID or 0)
+					if type(wowProjectID) == "boolean" or wowProjectID == WOW_PROJECT_ID then
+						visibleOnline = visibleOnline + 1
+					end
+				end
+			end
+		end
+	end
+
+	return visibleOnline, visibleOnline
+end
+
+local function UpdateFriendBlockText(updatePanel)
+	local totalRF = BNGetNumFriends()
+	local filteredBNetOnline = GetFilteredBNetCounts()
+	f.FriendsBlock.text = (config.showFriendsTotal and "%d/%d" or "%d"):format( onlineFriends + filteredBNetOnline, totalFriends + totalRF )
 	if updatePanel then f:BN_FRIEND_INFO_CHANGED() end
 end
 
@@ -218,7 +270,7 @@ end
 function f:FRIENDLIST_UPDATE()
 	--None bnet friends
 	for k,v in next,friendEntries do del(v) friendEntries[k]=nil end
-	onlineFriends = C_FriendList.GetNumOnlineFriends()
+	totalFriends, onlineFriends = GetFriendListCounts()
 	for i = 1, onlineFriends do	
 		local name, level, class, zone, connected, status, note
 		local info = GetFriendInfo(i)
@@ -627,9 +679,24 @@ local function SetToastData( index, inGroup )
 	local presenceID, presenceName, battleTag, isBattleTagPresence, toonName, toonID, client, isOnline, lastOnline, isAFK, isDND, broadcast, notes, _, _, _, _, _, isFavorite = GetBNGetFriendInfo(index)
 	--toasts[index].isOnline = isOnline
 	--toasts[index].isFavorite = isFavorite
-	if not isOnline and not isFavorite then return nil end
+	if config.bnetFriendsMode == "all" then
+		if not isOnline and not isFavorite then return nil end
+	elseif not isOnline then
+		return nil
+	end
 	local toast, bc, color = toasts[index]
 	local _, _, game, realm, realmID, faction, race, class, guild, zone, level, gameText, _, _, _, _, _, isGameAFK, isGameBusy, guid, wowProjectID = GetBNGetGameAccountInfo(toonID or 0)
+	client = clientsTable[client] or 5--Set client to desktop app if unknown
+	if config.bnetFriendsMode == "ingame" and (client == 0 or client == 5 or client == 8) then
+		return nil
+	elseif config.bnetFriendsMode == "samegame" then
+		if client ~= 1 then
+			return nil
+		end
+		if type(wowProjectID) ~= "boolean" and wowProjectID ~= WOW_PROJECT_ID then
+			return nil
+		end
+	end
 	local statusText = config.statusMode ~= "icon" and (isAFK or isDND) and (preformatedStatusText):format(isAFK and CHAT_FLAG_AFK or isDND and CHAT_FLAG_DND) or ""
 
     if (config.enableBnetFriendsBroadcasts) then
@@ -650,7 +717,6 @@ local function SetToastData( index, inGroup )
 	toast.unitrealm = realm
 
 	SetStatusLayout( --[[isMobile]]false, isAFK, isDND, toast.status, toast.name )
-	client = clientsTable[client] or 5--Set client to desktop app if unknown
 	toast.client = client
 	if client == 1 then--World of Warcraft
 		toast.faction:SetTexture"Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Factions"
@@ -892,6 +958,7 @@ UpdateTablet = function()
 	f:SetScale(config.scale)
 
 	local totalRF, onlineRF, entries = 0, 0
+	local visibleToasts = {}
 
 	if isGuild then
 		entries = guildEntries
@@ -899,14 +966,9 @@ UpdateTablet = function()
 	else
 		entries = friendEntries
 		totalRF, onlineRF, numBNetFavorite, numBNetFavoriteOnline = BNGetNumFriends()
-		local offlineFavorites = 0
-		if numBNetFavorite and numBNetFavoriteOnline then--Don't exist in classic at this time
-			offlineFavorites = numBNetFavorite - numBNetFavoriteOnline
-		end
-		nbRealFriends = onlineRF + offlineFavorites--Adjust for offline favorites that are stuck taking up entry spaces
+		nbRealFriends = 0
 	end
 
-	local nbTotalEntries = #entries + nbRealFriends
 	local rid_width, button = 0
 
 	realFriendsHeight = 0
@@ -919,12 +981,13 @@ UpdateTablet = function()
 	local spanZoneC = 0
 
 	--Pulls bnet friend toast data
-	if nbRealFriends > 0 then
+	if not isGuild and totalRF > 0 then
 		nbBroadcast = 0
-		for i=1, nbRealFriends do
+		for i=1, totalRF do
 			local button, client, tnW, lW, zW, nW, spanZoneW = SetToastData(i,inGroup)
 			
 			if button then--Rejects offline friends (except for favorates)
+				visibleToasts[#visibleToasts + 1] = i
 				if tnW>tnC then tnC=tnW end
 
 				if client == 1 then
@@ -937,6 +1000,7 @@ UpdateTablet = function()
 				if nW>nC then nC=nW end
 			end
 		end
+		nbRealFriends = #visibleToasts
 
 		realFriendsHeight = (nbRealFriends+nbBroadcast) * BUTTON_HEIGHT + (#entries>0 and GAP or 0)
 		
@@ -945,6 +1009,8 @@ UpdateTablet = function()
 		spanZoneC = max( spanZoneC, lC + GAP + ICON_SIZE + TEXT_OFFSET + zC )
 		rid_width = ICON_SIZE + TEXT_OFFSET + tnC + spanZoneC + nC + 2*GAP
 	end
+
+	local nbTotalEntries = #entries + nbRealFriends
 	
 	--Handles non bnet friends and guild members
 	sort(entries,SortMates)
@@ -1016,15 +1082,16 @@ UpdateTablet = function()
 	if not isGuild and nbRealFriends>0 then
 		local header, bcOffset = motd, 0
 		local bcWidth = maxWidth - 2*(ICON_SIZE - TEXT_OFFSET) -2*GAP
-		for i=1, #toasts do
+		for idx=1, #visibleToasts do
+			local i = visibleToasts[idx]
 			local b = toasts[i]
-			b:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, (1-i-bcOffset)*BUTTON_HEIGHT)
+			b:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, (1-idx-bcOffset)*BUTTON_HEIGHT)
 			if b.bcIndex then
 				bcOffset = bcOffset + 1
 				local bc = broadcasts[b.bcIndex]
 				bc.text:SetWidth(bcWidth)
-				bc:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, (1-i-bcOffset)*BUTTON_HEIGHT)
-				bc:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -ICON_SIZE-TEXT_OFFSET, (-i-bcOffset)*BUTTON_HEIGHT)
+				bc:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, (1-idx-bcOffset)*BUTTON_HEIGHT)
+				bc:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -ICON_SIZE-TEXT_OFFSET, (-idx-bcOffset)*BUTTON_HEIGHT)
 				bc:Show()
 			end
 			b:Show()
@@ -1043,8 +1110,8 @@ UpdateTablet = function()
 
 	UpdateScrollButtons(nbEntries)
 
-	for i=1, nbRealFriends do
-		button = toasts[i]
+	for idx=1, #visibleToasts do
+		button = toasts[visibleToasts[idx]]
 		button:SetWidth( maxWidth )
 		button.name:SetWidth(tnC)
 		if button.client == 1 then
@@ -1256,6 +1323,11 @@ function f:SetupConfigMenu()
 			{ text = "Sort third column", check = "hOrderC" },
 			{ text = "Resize tooltip", check = "hResizeTip" },
 			{ text = "Remove friend", check = "hRemoveFriend" },
+		} },
+		{ text = "Shown bnet friends", submenu = {
+			{ text = "All", radio = "bnetFriendsMode", val = "all" },
+			{ text = "Only online in games", radio = "bnetFriendsMode", val = "ingame" },
+			{ text = "Only online in my game", radio = "bnetFriendsMode", val = "samegame" },
 		} }
 	}
 	local aligns = { "LEFT", "CENTER", "RIGHT" }
@@ -1422,6 +1494,8 @@ function f:SetupConfigMenu()
 			UpdateGuildBlockText()
 		elseif var == "showFriendsTotal" then
 			UpdateFriendBlockText()
+		elseif var == "bnetFriendsMode" then
+			UpdateFriendBlockText(true)
 		elseif var == "statusMode" then
 			PreFormatStatusText(colors.status)
 		elseif var:find"^align" then
@@ -1647,6 +1721,8 @@ function f:ADDON_LOADED( addon )
 	end )
 
 	motd = buttons[0]
+	totalFriends, onlineFriends = GetFriendListCounts()
+	UpdateFriendBlockText()
 	if RequestFriendsList then RequestFriendsList() end
 	guildTimer = 14 -- delay update to avoid d/c
 	f:GUILD_ROSTER_UPDATE()
