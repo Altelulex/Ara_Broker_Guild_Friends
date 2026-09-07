@@ -1544,7 +1544,12 @@ f.GuildBlock = ldb:NewDataObject( "|cFFFFB366Ara|r Guild", {
 		if button == "LeftButton" then
 			ToggleGuildFrame()
 			if GuildFrame and GuildFrame:IsShown() then
-				GuildFrameTab2:Click()
+				local guildTab = _G.GuildFrameTab2
+				if guildTab and guildTab.Click then
+					guildTab:Click()
+				elseif GuildFrame_SetTab then
+					GuildFrame_SetTab(GuildFrame, 2)
+				end
 				f.GuildBlock.OnLeave(self)
 			else	f.GuildBlock.OnEnter(self) end
 		elseif button == "RightButton" then
