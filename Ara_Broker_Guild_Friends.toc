@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120100, 11509, 40402, 16001, 50504, 20506, 30405
 
 ## Title: Ara - Broker - Guild & Friends
 ## Version: @project-version@
