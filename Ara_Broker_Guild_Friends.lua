@@ -149,8 +149,13 @@ local function GetBNGetGameAccountInfo(toonId)
 		local gameAccountInfo = _G.C_BattleNet.GetGameAccountInfoByID(toonId) or {}
 		local wowProjectID = gameAccountInfo.wowProjectID or 0;
 		local characterName = gameAccountInfo.characterName or "";
-		local realmName = gameAccountInfo.realmName or "";
-		local realmID = gameAccountInfo.realmID or 0;
+		if wowTOC <= 20000 and wowTOC >= 16001 then
+			local realmName = "Forever";
+			local realmID = 0;
+		else
+			local realmName = gameAccountInfo.realmName or "";
+			local realmID = gameAccountInfo.realmID or 0;
+		end
 		local factionName = gameAccountInfo.factionName or "";
 		local raceName = gameAccountInfo.raceName or "";
 		local className = gameAccountInfo.className or "";
@@ -244,7 +249,7 @@ local function GetFilteredBNetCounts()
 				end
 			elseif config.bnetFriendsMode == "samegame" then
 				if client == 1 then
-					local _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, wowProjectID = GetBNGetGameAccountInfo(toonID or 0)
+					local _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, wowProjectID = GetBNGetGameAccountInfo(toonID or 0)
 					if type(wowProjectID) == "boolean" or wowProjectID == WOW_PROJECT_ID then
 						visibleOnline = visibleOnline + 1
 					end
@@ -739,7 +744,11 @@ local function SetToastData( index, inGroup )
 		if not toast.sameRealm then
 			-- hide faction icon and move zone to level
 			local r,g,b = unpack(colors.realm)
-			zone = ("%1$s |cff%3$.2x%4$.2x%5$.2x- %2$s"):format(zone, realm or UNKNOWN, r*255, g*255, b*255)
+			if wowTOC <= 20000 and wowTOC >= 16001 then
+				zone = ("%1$s |cff%3$.2x%4$.2x%5$.2x"):format(zone, realm or "", r*255, g*255, b*255)
+			else
+				zone = ("%1$s |cff%3$.2x%4$.2x%5$.2x- %2$s"):format(zone, realm or UNKNOWN, r*255, g*255, b*255)
+			end
 		end
 		class = L[class]
 		if class and class~="" then
